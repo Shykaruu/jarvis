@@ -5,7 +5,7 @@ type LLMConfig = {
   primary: string;
   fallback: string[];
   anthropic: { model: string; has_api_key: boolean } | null;
-  openai: { model: string; has_api_key: boolean } | null;
+  openai: { model: string; has_api_key: boolean; base_url?: string } | null;
   groq: { model: string; has_api_key: boolean } | null;
   gemini: { model: string; has_api_key: boolean } | null;
   ollama: { base_url: string; model: string } | null;
@@ -102,6 +102,7 @@ export function LLMPanel() {
   const [openaiKey, setOpenaiKey] = useState("");
   const [openaiModel, setOpenaiModel] = useState("gpt-5.4");
   const [openaiCustomModel, setOpenaiCustomModel] = useState("");
+  const [openaiBaseUrl, setOpenaiBaseUrl] = useState("");
 
   // Groq
   const [groqKey, setGroqKey] = useState("");
@@ -147,6 +148,7 @@ export function LLMPanel() {
       }
     }
     if (config.openai) {
+      setOpenaiBaseUrl(config.openai.base_url ?? "");
       const m = config.openai.model;
       if (OPENAI_MODELS.includes(m)) {
         setOpenaiModel(m);
@@ -215,6 +217,7 @@ export function LLMPanel() {
         },
         openai: {
           model: resolveModel(openaiModel, openaiCustomModel),
+          base_url: openaiBaseUrl,
           ...(openaiKey ? { api_key: openaiKey } : {}),
         },
         groq: {
@@ -264,6 +267,7 @@ export function LLMPanel() {
       } else if (provider === "openai") {
         body.api_key = openaiKey || undefined;
         body.model = resolveModel(openaiModel, openaiCustomModel);
+        body.base_url = openaiBaseUrl;
       } else if (provider === "groq") {
         body.api_key = groqKey || undefined;
         body.model = resolveModel(groqModel, groqCustomModel);
@@ -381,6 +385,11 @@ export function LLMPanel() {
           onFallbackToggle={() => toggleFallback("openai")}
           expanded={!!expanded.openai}
           onToggleExpand={() => setExpanded((s) => ({ ...s, openai: !s.openai }))}
+          baseUrl={openaiBaseUrl}
+          onBaseUrlChange={setOpenaiBaseUrl}
+          baseUrlLabel="OpenAI-Compatible Base URL"
+          baseUrlPlaceholder="Leave blank for official OpenAI API"
+          baseUrlHelpText="Optional. Use the OpenAI-compatible API base URL exposed by your gateway or proxy."
         />
 
         <ProviderSection
@@ -505,6 +514,9 @@ type ProviderSectionProps = {
   hideApiKey?: boolean;
   baseUrl?: string;
   onBaseUrlChange?: (v: string) => void;
+  baseUrlLabel?: string;
+  baseUrlPlaceholder?: string;
+  baseUrlHelpText?: string;
 };
 
 function ToggleSwitch({ checked, onChange, disabled }: { checked: boolean; onChange: () => void; disabled?: boolean }) {
@@ -551,7 +563,7 @@ function ProviderSection({
   models, testing, testResult, onTest,
   isFallback, onFallbackToggle,
   expanded, onToggleExpand,
-  hideApiKey, baseUrl, onBaseUrlChange,
+  hideApiKey, baseUrl, onBaseUrlChange, baseUrlLabel, baseUrlPlaceholder, baseUrlHelpText,
 }: ProviderSectionProps) {
   return (
     <div style={providerCardStyle}>
@@ -603,14 +615,17 @@ function ProviderSection({
 
           {baseUrl !== undefined && onBaseUrlChange && (
             <div>
-              <div style={fieldLabelStyle}>Base URL</div>
+              <div style={fieldLabelStyle}>{baseUrlLabel ?? "Base URL"}</div>
               <input
                 type="text"
                 value={baseUrl}
                 onChange={(e) => onBaseUrlChange(e.target.value)}
-                placeholder="http://localhost:11434"
+                placeholder={baseUrlPlaceholder ?? "http://localhost:11434"}
                 style={inputStyle}
               />
+              {baseUrlHelpText && (
+                <div style={{ ...fieldHelpStyle, marginTop: "4px" }}>{baseUrlHelpText}</div>
+              )}
             </div>
           )}
 
@@ -698,6 +713,12 @@ const fieldLabelStyle: React.CSSProperties = {
   fontSize: "11px",
   color: "var(--j-text-muted)",
   marginBottom: "4px",
+};
+
+const fieldHelpStyle: React.CSSProperties = {
+  fontSize: "11px",
+  color: "var(--j-text-muted)",
+  lineHeight: 1.4,
 };
 
 const providerCardStyle: React.CSSProperties = {
