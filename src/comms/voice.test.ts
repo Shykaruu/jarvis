@@ -40,6 +40,19 @@ describe('createSTTProvider factory', () => {
     expect(provider).toBeInstanceOf(OpenAIWhisperSTT);
   });
 
+  test('passes custom OpenAI-compatible base URL to OpenAIWhisperSTT', () => {
+    const config: STTConfig = {
+      provider: 'openai',
+      openai: {
+        api_key: 'test-openai-key-not-real',
+        base_url: 'https://gateway.example.com/openai',
+      },
+    };
+    const provider = createSTTProvider(config) as any;
+    expect(provider).toBeInstanceOf(OpenAIWhisperSTT);
+    expect(provider.apiUrl).toBe('https://gateway.example.com/openai/audio/transcriptions');
+  });
+
   test('returns null when provider=openai and no key', () => {
     const config: STTConfig = { provider: 'openai' };
     const provider = createSTTProvider(config);
@@ -431,5 +444,45 @@ describe('LocalWhisperSTT.transcribe', () => {
     } catch (err: any) {
       expect(err.message).toBe('Connection refused');
     }
+  });
+});
+
+describe('OpenAIWhisperSTT.transcribe', () => {
+  const originalFetch = globalThis.fetch;
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  test('defaults to the official OpenAI transcription endpoint', async () => {
+    const stt = new OpenAIWhisperSTT('test-key');
+    const wav = makeWavBuffer();
+    let calledUrl = '';
+
+    globalThis.fetch = mock(async (url: string) => {
+      calledUrl = url;
+      return new Response(JSON.stringify({ text: 'ok' }), {
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as any;
+
+    await stt.transcribe(wav);
+    expect(calledUrl).toBe('https://api.openai.com/v1/audio/transcriptions');
+  });
+
+  test('uses a configured OpenAI-compatible base URL for transcriptions', async () => {
+    const stt = new OpenAIWhisperSTT('test-key', 'whisper-1', 'https://gateway.example.com/openai');
+    const wav = makeWavBuffer();
+    let calledUrl = '';
+
+    globalThis.fetch = mock(async (url: string) => {
+      calledUrl = url;
+      return new Response(JSON.stringify({ text: 'ok' }), {
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as any;
+
+    await stt.transcribe(wav);
+    expect(calledUrl).toBe('https://gateway.example.com/openai/audio/transcriptions');
   });
 });

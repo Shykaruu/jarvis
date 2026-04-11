@@ -26,7 +26,8 @@ async function testProviders() {
   if (config.llm.openai?.api_key) {
     const openai = new OpenAIProvider(
       config.llm.openai.api_key,
-      config.llm.openai.model
+      config.llm.openai.model,
+      config.llm.openai.base_url,
     );
     manager.registerProvider(openai);
     console.log('Registered OpenAI provider');

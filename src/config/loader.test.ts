@@ -31,6 +31,11 @@ describe('Config Loader', () => {
     const testConfig = structuredClone(DEFAULT_CONFIG);
     testConfig.daemon.port = 9999;
     testConfig.llm.primary = 'openai';
+    testConfig.llm.openai = {
+      api_key: testConfig.llm.openai?.api_key ?? '',
+      model: testConfig.llm.openai?.model,
+      base_url: 'https://api.openai.com/v1',
+    };
 
     await saveConfig(testConfig, TEST_CONFIG_PATH);
     expect(existsSync(TEST_CONFIG_PATH)).toBe(true);
@@ -38,6 +43,7 @@ describe('Config Loader', () => {
     const loaded = await loadConfig(TEST_CONFIG_PATH);
     expect(loaded.daemon.port).toBe(9999);
     expect(loaded.llm.primary).toBe('openai');
+    expect(loaded.llm.openai?.base_url).toBe('https://api.openai.com/v1');
   });
 
   test('deep merges partial config with defaults', async () => {
@@ -108,6 +114,7 @@ describe('Default Config', () => {
   test('has correct LLM defaults', () => {
     expect(DEFAULT_CONFIG.llm.anthropic?.model).toBe('claude-sonnet-4-6');
     expect(DEFAULT_CONFIG.llm.openai?.model).toBe('gpt-5.4');
+    expect(DEFAULT_CONFIG.llm.openai?.base_url).toBeUndefined();
     expect(DEFAULT_CONFIG.llm.gemini?.model).toBe('gemini-3-flash-preview');
     expect(DEFAULT_CONFIG.llm.ollama?.model).toBe('llama3');
     expect(DEFAULT_CONFIG.llm.ollama?.base_url).toBe('http://localhost:11434');

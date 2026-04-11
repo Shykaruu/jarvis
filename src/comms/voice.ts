@@ -1,5 +1,6 @@
 import type { STTConfig, TTSConfig } from '../config/types.ts';
 import { Communicate } from 'edge-tts-universal';
+import { resolveOpenAIBaseUrl } from '../llm/openai.ts';
 
 export interface STTProvider {
   transcribe(audio: Buffer): Promise<string>;
@@ -16,10 +17,12 @@ export interface TTSProvider {
 export class OpenAIWhisperSTT implements STTProvider {
   private apiKey: string;
   private model: string;
+  private apiUrl: string;
 
-  constructor(apiKey: string, model: string = 'whisper-1') {
+  constructor(apiKey: string, model: string = 'whisper-1', baseUrl?: string) {
     this.apiKey = apiKey;
     this.model = model;
+    this.apiUrl = new URL('audio/transcriptions', resolveOpenAIBaseUrl(baseUrl)).toString();
   }
 
   async transcribe(audio: Buffer): Promise<string> {
@@ -28,7 +31,7 @@ export class OpenAIWhisperSTT implements STTProvider {
     formData.append('model', this.model);
     formData.append('language', 'en');
 
-    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    const response = await fetch(this.apiUrl, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${this.apiKey}` },
       body: formData,
@@ -166,7 +169,7 @@ export function createSTTProvider(config: STTConfig): STTProvider | null {
   switch (config.provider) {
     case 'openai':
       if (!config.openai?.api_key) return null;
-      return new OpenAIWhisperSTT(config.openai.api_key, config.openai.model);
+      return new OpenAIWhisperSTT(config.openai.api_key, config.openai.model, config.openai.base_url);
     case 'groq':
       if (!config.groq?.api_key) return null;
       return new GroqWhisperSTT(config.groq.api_key, config.groq.model);

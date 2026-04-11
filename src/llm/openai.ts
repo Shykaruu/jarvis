@@ -79,15 +79,35 @@ type OpenAIStreamChunk = {
   }>;
 };
 
+const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1/';
+
+export function resolveOpenAIBaseUrl(baseUrl?: string): URL {
+  const trimmed = baseUrl?.trim();
+  const rawBaseUrl = trimmed && trimmed.length > 0 ? trimmed : DEFAULT_OPENAI_BASE_URL;
+  const resolved = new URL(rawBaseUrl);
+
+  if (!resolved.pathname.endsWith('/')) {
+    resolved.pathname = `${resolved.pathname}/`;
+  }
+
+  return resolved;
+}
+
 export class OpenAIProvider implements LLMProvider {
   name = 'openai';
   private apiKey: string;
   private defaultModel: string;
-  private apiUrl = 'https://api.openai.com/v1/chat/completions';
+  private baseUrl: string;
+  private apiUrl: string;
+  private modelsUrl: string;
 
-  constructor(apiKey: string, defaultModel = 'gpt-4o') {
+  constructor(apiKey: string, defaultModel = 'gpt-4o', baseUrl?: string) {
     this.apiKey = apiKey;
     this.defaultModel = defaultModel;
+    const resolvedBaseUrl = resolveOpenAIBaseUrl(baseUrl);
+    this.baseUrl = resolvedBaseUrl.toString();
+    this.apiUrl = new URL('chat/completions', resolvedBaseUrl).toString();
+    this.modelsUrl = new URL('models', resolvedBaseUrl).toString();
   }
 
   async chat(messages: LLMMessage[], options: LLMOptions = {}): Promise<LLMResponse> {
@@ -269,7 +289,7 @@ export class OpenAIProvider implements LLMProvider {
 
   async listModels(): Promise<string[]> {
     try {
-      const response = await fetch('https://api.openai.com/v1/models', {
+      const response = await fetch(this.modelsUrl, {
         headers: {
           'Authorization': `Bearer ${this.apiKey}`,
         },
@@ -282,7 +302,6 @@ export class OpenAIProvider implements LLMProvider {
       const data = await response.json() as { data: Array<{ id: string }> };
       return data.data
         .map(m => m.id)
-        .filter(id => id.startsWith('gpt-'))
         .sort();
     } catch (err) {
       // Fallback to known models if API call fails

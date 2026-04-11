@@ -93,7 +93,11 @@ export async function runDoctor(): Promise<void> {
       if (primary === 'anthropic' && config.llm?.anthropic?.api_key) {
         manager.registerProvider(new AnthropicProvider(config.llm.anthropic.api_key, config.llm.anthropic.model));
       } else if (primary === 'openai' && config.llm?.openai?.api_key) {
-        manager.registerProvider(new OpenAIProvider(config.llm.openai.api_key, config.llm.openai.model));
+        manager.registerProvider(new OpenAIProvider(
+          config.llm.openai.api_key,
+          config.llm.openai.model,
+          config.llm.openai.base_url,
+        ));
       } else if (primary === 'groq' && config.llm?.groq?.api_key) {
         manager.registerProvider(new GroqProvider(config.llm.groq.api_key, config.llm.groq.model));
       } else if (primary === 'gemini' && config.llm?.gemini?.api_key) {

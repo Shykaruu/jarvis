@@ -1,6 +1,6 @@
 import { test, expect, describe, beforeEach, afterEach, mock } from 'bun:test';
 import { AnthropicProvider } from './anthropic.ts';
-import { OpenAIProvider } from './openai.ts';
+import { OpenAIProvider, resolveOpenAIBaseUrl } from './openai.ts';
 import { GroqProvider } from './groq.ts';
 import { OllamaProvider } from './ollama.ts';
 import { OpenRouterProvider } from './openrouter.ts';
@@ -131,6 +131,18 @@ describe('Provider URLs', () => {
     expect(provider.apiUrl).toBe('https://api.openai.com/v1/chat/completions');
   });
 
+  test('OpenAIProvider uses custom compatible base URL as the request base', () => {
+    const provider = new OpenAIProvider('test-key', 'test-model', 'https://gateway.example.com/v1/') as any;
+    expect(provider.baseUrl).toBe('https://gateway.example.com/v1/');
+    expect(provider.apiUrl).toBe('https://gateway.example.com/v1/chat/completions');
+  });
+
+  test('OpenAIProvider preserves custom path prefixes in compatible base URLs', () => {
+    const provider = new OpenAIProvider('test-key', 'test-model', 'https://gateway.example.com/openai/') as any;
+    expect(provider.baseUrl).toBe('https://gateway.example.com/openai/');
+    expect(provider.apiUrl).toBe('https://gateway.example.com/openai/chat/completions');
+  });
+
   test('OpenRouterProvider uses correct API URL', () => {
     const provider = new OpenRouterProvider('test-key') as any;
     expect(provider.apiUrl).toBe('https://openrouter.ai/api/v1/chat/completions');
@@ -149,6 +161,24 @@ describe('Provider URLs', () => {
   test('OllamaProvider removes trailing slash from base URL', () => {
     const provider = new OllamaProvider('http://localhost:11434/') as any;
     expect(provider.baseUrl).toBe('http://localhost:11434');
+  });
+});
+
+describe('OpenAI base URL resolution', () => {
+  test('uses official OpenAI API when omitted', () => {
+    expect(resolveOpenAIBaseUrl().toString()).toBe('https://api.openai.com/v1/');
+  });
+
+  test('adds a trailing slash so relative endpoints resolve consistently', () => {
+    expect(resolveOpenAIBaseUrl('https://gateway.example.com/v1').toString()).toBe('https://gateway.example.com/v1/');
+  });
+
+  test('preserves the provided base path', () => {
+    expect(resolveOpenAIBaseUrl('https://gateway.example.com/openai').toString()).toBe('https://gateway.example.com/openai/');
+  });
+
+  test('rejects invalid URLs', () => {
+    expect(() => resolveOpenAIBaseUrl('not-a-url')).toThrow();
   });
 });
 
