@@ -148,7 +148,14 @@ export async function runOnboard(): Promise<void> {
     const isPreset = openaiModels.some(m => m.value === currentModel);
     const modelChoice = await askChoice('Choose a model:', openaiModels, isPreset ? currentModel : 'custom');
     const model = modelChoice === 'custom' ? await ask('Enter model name', currentModel) : modelChoice;
-    if (config.llm.openai) config.llm.openai.model = model;
+    const openaiBaseUrl = await ask(
+      'OpenAI-compatible base URL (optional, leave blank for official OpenAI API)',
+      config.llm.openai?.base_url ?? '',
+    );
+    if (config.llm.openai) {
+      config.llm.openai.model = model;
+      config.llm.openai.base_url = openaiBaseUrl.trim() || undefined;
+    }
 
   } else if (provider === 'groq') {
     const existing = config.llm.groq?.api_key;
@@ -279,7 +286,11 @@ export async function runOnboard(): Promise<void> {
       if (provider === 'anthropic' && config.llm.anthropic?.api_key) {
         manager.registerProvider(new AnthropicProvider(config.llm.anthropic.api_key, config.llm.anthropic.model));
       } else if (provider === 'openai' && config.llm.openai?.api_key) {
-        manager.registerProvider(new OpenAIProvider(config.llm.openai.api_key, config.llm.openai.model));
+        manager.registerProvider(new OpenAIProvider(
+          config.llm.openai.api_key,
+          config.llm.openai.model,
+          config.llm.openai.base_url,
+        ));
       } else if (provider === 'groq' && config.llm.groq?.api_key) {
         manager.registerProvider(new GroqProvider(config.llm.groq.api_key, config.llm.groq.model));
       } else if (provider === 'gemini' && config.llm.gemini?.api_key) {
@@ -324,7 +335,18 @@ export async function runOnboard(): Promise<void> {
         if (key) config.llm.anthropic = { ...config.llm.anthropic, api_key: key, model: config.llm.anthropic?.model ?? 'claude-sonnet-4-6' };
       } else if (fb === 'openai' && (!config.llm.openai?.api_key || config.llm.openai.api_key === '')) {
         const key = await askSecret('OpenAI API key (for fallback)');
-        if (key) config.llm.openai = { ...config.llm.openai, api_key: key, model: config.llm.openai?.model ?? 'gpt-5.4' };
+        if (key) {
+          const baseUrl = await ask(
+            'OpenAI-compatible base URL for fallback (optional, leave blank for official OpenAI API)',
+            config.llm.openai?.base_url ?? '',
+          );
+          config.llm.openai = {
+            ...config.llm.openai,
+            api_key: key,
+            model: config.llm.openai?.model ?? 'gpt-5.4',
+            base_url: baseUrl.trim() || undefined,
+          };
+        }
       } else if (fb === 'groq' && (!config.llm.groq?.api_key || config.llm.groq.api_key === '')) {
         const key = await askSecret('Groq API key (for fallback)');
         if (key) config.llm.groq = { ...config.llm.groq, api_key: key, model: config.llm.groq?.model ?? 'llama-3.3-70b-versatile' };
@@ -472,18 +494,39 @@ export async function runOnboard(): Promise<void> {
     config.stt = { provider: sttProvider };
 
     if (sttProvider === 'openai') {
+      const defaultSttBaseUrl = config.stt.openai?.base_url ?? config.llm.openai?.base_url ?? '';
+
       // Reuse OpenAI API key if already set
       if (config.llm.openai?.api_key) {
         const reuse = await askYesNo('Reuse your OpenAI API key for STT?', true);
         if (reuse) {
-          config.stt.openai = { api_key: config.llm.openai.api_key };
+          const baseUrl = await ask(
+            'OpenAI-compatible base URL for STT (optional, leave blank for official OpenAI API)',
+            defaultSttBaseUrl,
+          );
+          config.stt.openai = {
+            api_key: config.llm.openai.api_key,
+            base_url: baseUrl.trim() || undefined,
+          };
         } else {
           const key = await askSecret('OpenAI API key for STT');
-          if (key) config.stt.openai = { api_key: key };
+          if (key) {
+            const baseUrl = await ask(
+              'OpenAI-compatible base URL for STT (optional, leave blank for official OpenAI API)',
+              defaultSttBaseUrl,
+            );
+            config.stt.openai = { api_key: key, base_url: baseUrl.trim() || undefined };
+          }
         }
       } else {
         const key = await askSecret('OpenAI API key for Whisper STT');
-        if (key) config.stt.openai = { api_key: key };
+        if (key) {
+          const baseUrl = await ask(
+            'OpenAI-compatible base URL for STT (optional, leave blank for official OpenAI API)',
+            defaultSttBaseUrl,
+          );
+          config.stt.openai = { api_key: key, base_url: baseUrl.trim() || undefined };
+        }
       }
     } else if (sttProvider === 'groq') {
       const key = await askSecret('Groq API key (from console.groq.com)');
