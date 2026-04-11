@@ -80,6 +80,7 @@ type OpenAIStreamChunk = {
 };
 
 const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1/';
+const OFFICIAL_OPENAI_HOSTNAME = 'api.openai.com';
 
 export function resolveOpenAIBaseUrl(baseUrl?: string): URL {
   const trimmed = baseUrl?.trim();
@@ -91,6 +92,17 @@ export function resolveOpenAIBaseUrl(baseUrl?: string): URL {
   }
 
   return resolved;
+}
+
+export function isOfficialOpenAI(baseUrl?: string): boolean {
+  const trimmed = baseUrl?.trim();
+  if (!trimmed) return true;
+
+  try {
+    return resolveOpenAIBaseUrl(trimmed).hostname === OFFICIAL_OPENAI_HOSTNAME;
+  } catch {
+    return false;
+  }
 }
 
 export class OpenAIProvider implements LLMProvider {

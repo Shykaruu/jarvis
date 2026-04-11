@@ -12,7 +12,7 @@ export interface TTSProvider {
 }
 
 /**
- * OpenAI Whisper STT — uses the OpenAI /v1/audio/transcriptions endpoint.
+ * OpenAI Whisper STT — uses the resolved OpenAI-compatible audio/transcriptions endpoint.
  */
 export class OpenAIWhisperSTT implements STTProvider {
   private apiKey: string;

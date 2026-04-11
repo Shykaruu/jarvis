@@ -1,6 +1,6 @@
 import { test, expect, describe, beforeEach, afterEach, mock } from 'bun:test';
 import { AnthropicProvider } from './anthropic.ts';
-import { OpenAIProvider, resolveOpenAIBaseUrl } from './openai.ts';
+import { OpenAIProvider, isOfficialOpenAI, resolveOpenAIBaseUrl } from './openai.ts';
 import { GroqProvider } from './groq.ts';
 import { OllamaProvider } from './ollama.ts';
 import { OpenRouterProvider } from './openrouter.ts';
@@ -179,6 +179,15 @@ describe('OpenAI base URL resolution', () => {
 
   test('rejects invalid URLs', () => {
     expect(() => resolveOpenAIBaseUrl('not-a-url')).toThrow();
+  });
+
+  test('treats the default endpoint as official OpenAI', () => {
+    expect(isOfficialOpenAI()).toBe(true);
+    expect(isOfficialOpenAI('https://api.openai.com/v1')).toBe(true);
+  });
+
+  test('treats custom compatible gateways as non-official OpenAI', () => {
+    expect(isOfficialOpenAI('https://gateway.example.com/openai')).toBe(false);
   });
 });
 

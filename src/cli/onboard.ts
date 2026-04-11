@@ -15,6 +15,7 @@ import {
 } from './helpers.ts';
 import { DEFAULT_CONFIG, type JarvisConfig } from '../config/types.ts';
 import { loadConfig, saveConfig } from '../config/loader.ts';
+import { isOfficialOpenAI } from '../llm/openai.ts';
 import { installAutostart, startAutostartService, getAutostartName, isAutostartSupported } from './autostart.ts';
 import { runDependencyCheck } from './deps.ts';
 import { initDatabase, closeDb } from '../vault/schema.ts';
@@ -116,14 +117,19 @@ export async function runOnboard(): Promise<void> {
 
   } else if (provider === 'openai') {
     const existing = config.llm.openai?.api_key;
-    if (existing && existing.startsWith('sk-')) {
+    const officialOpenAI = isOfficialOpenAI(config.llm.openai?.base_url);
+    const openAIKeyPrompt = officialOpenAI
+      ? 'Enter your OpenAI API key (from platform.openai.com)'
+      : 'Enter your OpenAI-compatible API key';
+
+    if (existing && existing.trim().length > 0) {
       const keep = await askYesNo(`API key found (${existing.slice(0, 10)}...). Keep it?`, true);
       if (!keep) {
-        const key = await askSecret('Enter your OpenAI API key');
+        const key = await askSecret(openAIKeyPrompt);
         if (key) config.llm.openai = { ...config.llm.openai, api_key: key };
       }
     } else {
-      const key = await askSecret('Enter your OpenAI API key (from platform.openai.com)');
+      const key = await askSecret(openAIKeyPrompt);
       if (key) {
         config.llm.openai = { ...config.llm.openai, api_key: key };
       } else {
@@ -495,6 +501,10 @@ export async function runOnboard(): Promise<void> {
 
     if (sttProvider === 'openai') {
       const defaultSttBaseUrl = config.stt.openai?.base_url ?? config.llm.openai?.base_url ?? '';
+      const officialOpenAIStt = isOfficialOpenAI(defaultSttBaseUrl);
+      const sttKeyPrompt = officialOpenAIStt
+        ? 'OpenAI API key for Whisper STT'
+        : 'OpenAI-compatible API key for Whisper STT';
 
       // Reuse OpenAI API key if already set
       if (config.llm.openai?.api_key) {
@@ -509,7 +519,7 @@ export async function runOnboard(): Promise<void> {
             base_url: baseUrl.trim() || undefined,
           };
         } else {
-          const key = await askSecret('OpenAI API key for STT');
+          const key = await askSecret(sttKeyPrompt);
           if (key) {
             const baseUrl = await ask(
               'OpenAI-compatible base URL for STT (optional, leave blank for official OpenAI API)',
@@ -519,7 +529,7 @@ export async function runOnboard(): Promise<void> {
           }
         }
       } else {
-        const key = await askSecret('OpenAI API key for Whisper STT');
+        const key = await askSecret(sttKeyPrompt);
         if (key) {
           const baseUrl = await ask(
             'OpenAI-compatible base URL for STT (optional, leave blank for official OpenAI API)',

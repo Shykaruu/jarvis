@@ -485,4 +485,20 @@ describe('OpenAIWhisperSTT.transcribe', () => {
     await stt.transcribe(wav);
     expect(calledUrl).toBe('https://gateway.example.com/openai/audio/transcriptions');
   });
+
+  test('accepts non-standard API key formats for compatible gateways', async () => {
+    const stt = new OpenAIWhisperSTT('nvapi-custom-key', 'whisper-1', 'https://gateway.example.com/openai');
+    const wav = makeWavBuffer();
+    let authHeader = '';
+
+    globalThis.fetch = mock(async (_url: string, init?: RequestInit) => {
+      authHeader = String((init?.headers as Record<string, string> | undefined)?.Authorization ?? '');
+      return new Response(JSON.stringify({ text: 'ok' }), {
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as any;
+
+    await stt.transcribe(wav);
+    expect(authHeader).toBe('Bearer nvapi-custom-key');
+  });
 });
