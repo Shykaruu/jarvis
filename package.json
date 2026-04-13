@@ -1,6 +1,6 @@
 {
   "name": "@shykaruu/jarvis-brain",
-  "version": "0.4.1",
+  "version": "0.4.4",
   "description": "J.A.R.V.I.S. — Just A Rather Very Intelligent System. An always-on autonomous AI daemon.",
   "module": "src/daemon/index.ts",
   "type": "module",
@@ -12,7 +12,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vierisid/jarvis.git"
+    "url": "git+https://github.com/Shykaruu/jarvis.git"
   },
   "license": "SEE LICENSE IN LICENSE",
   "keywords": ["jarvis", "ai", "daemon", "assistant", "cli"],
