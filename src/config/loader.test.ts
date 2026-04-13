@@ -30,6 +30,7 @@ describe('Config Loader', () => {
   test('can save and load config', async () => {
     const testConfig = structuredClone(DEFAULT_CONFIG);
     testConfig.daemon.port = 9999;
+    testConfig.daemon.brain_url = 'wss://axiom-er.ddns.net/sidecar';
     testConfig.llm.primary = 'openai';
     testConfig.dashboard = { password_hash: '$2b$test-hash' };
 
@@ -38,6 +39,7 @@ describe('Config Loader', () => {
 
     const loaded = await loadConfig(TEST_CONFIG_PATH);
     expect(loaded.daemon.port).toBe(9999);
+    expect(loaded.daemon.brain_url).toBe('wss://axiom-er.ddns.net/sidecar');
     expect(loaded.llm.primary).toBe('openai');
     expect(loaded.dashboard?.password_hash).toBe('$2b$test-hash');
   });

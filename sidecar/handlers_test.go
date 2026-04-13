@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -24,8 +25,12 @@ func TestRunCommand(t *testing.T) {
 			t.Errorf("expected exit_code 0, got %v", m["exit_code"])
 		}
 		stdout := m["stdout"].(string)
-		if stdout != "hello\n" {
-			t.Errorf("expected 'hello\\n', got %q", stdout)
+		expected := "hello\n"
+		if runtime.GOOS == "windows" {
+			expected = "hello\r\n"
+		}
+		if stdout != expected {
+			t.Errorf("expected %q, got %q", expected, stdout)
 		}
 	})
 
