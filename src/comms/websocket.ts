@@ -1,13 +1,11 @@
 import type { Server, ServerWebSocket } from 'bun';
-import { timingSafeEqual } from 'node:crypto';
 import path from 'node:path';
 import type { SidecarManager } from '../sidecar/manager.ts';
-
-/** Constant-time string comparison to prevent timing attacks */
-function safeCompare(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
-}
+import {
+  getCookie,
+  getDashboardSessionFromRequest,
+  safeCompare,
+} from './dashboard-auth.ts';
 
 export type WSMessage = {
   type: 'chat' | 'command' | 'status' | 'stream' | 'error' | 'notification'
@@ -37,18 +35,15 @@ const AUTH_ERROR_HTML = await Bun.file(path.join(import.meta.dir, 'auth-error.ht
 /** Inline script injected into authed HTML pages — strips ?token= from the hash. */
 const TOKEN_STRIP_SCRIPT = `<script>(function(){var h=location.hash,i=h.indexOf('?');if(i===-1)return;var p=new URLSearchParams(h.slice(i));if(!p.has('token'))return;p.delete('token');var c=h.slice(0,i),r=p.toString();if(r)c+='?'+r;location.replace(location.pathname+location.search+c)})()</script>`;
 
-function getCookie(req: Request, name: string): string | null {
-  const cookies = req.headers.get('Cookie');
-  if (!cookies) return null;
-  const match = cookies.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
-  return match ? decodeURIComponent(match[1]!) : null;
-}
-
 function isPublicRoute(pathname: string, method: string): boolean {
   return (
     pathname === '/health' ||
     pathname === '/sidecar/connect' ||
     pathname === '/api/sidecars/.well-known/jwks.json' ||
+    pathname === '/api/auth/login' ||
+    pathname === '/api/auth/logout' ||
+    pathname === '/api/auth/session' ||
+    pathname === '/api/auth/google/callback' ||
     pathname.startsWith('/api/webhooks/') ||
     method === 'OPTIONS'
   );
@@ -88,6 +83,7 @@ export class WebSocketServer {
   private publicDir: string | null = null;
   private sidecarManager: SidecarManager | null = null;
   private authToken: string | null = null;
+  private dashboardPasswordHash: string | null = null;
   private corsOrigin: string | null = null;
   private proxyLimiter = new ProxyRateLimiter();
 
@@ -98,6 +94,10 @@ export class WebSocketServer {
 
   setAuthToken(token: string): void {
     this.authToken = token;
+  }
+
+  setDashboardPasswordHash(passwordHash?: string | null): void {
+    this.dashboardPasswordHash = passwordHash?.trim() || null;
   }
 
   setHandler(handler: WSClientHandler): void {
@@ -177,10 +177,56 @@ export class WebSocketServer {
         }
 
         // 1. Auth check (if configured)
-        if (self.authToken && !isPublicRoute(pathname, req.method)) {
-          const cookieToken = getCookie(req, 'token');
-          if (!cookieToken || !safeCompare(cookieToken, self.authToken)) {
+        const tokenAuthEnabled = Boolean(self.authToken);
+        const passwordAuthEnabled = Boolean(self.dashboardPasswordHash);
+        const dashboardAuthEnabled = tokenAuthEnabled || passwordAuthEnabled;
+        const cookieToken = tokenAuthEnabled ? getCookie(req, 'token') : null;
+        const hasValidToken = Boolean(
+          tokenAuthEnabled &&
+          self.authToken &&
+          cookieToken &&
+          safeCompare(cookieToken, self.authToken),
+        );
+        const queryToken = tokenAuthEnabled ? url.searchParams.get('token') : null;
+        const hasValidQueryToken = Boolean(
+          tokenAuthEnabled &&
+          self.authToken &&
+          queryToken &&
+          safeCompare(queryToken, self.authToken),
+        );
+        const session = passwordAuthEnabled ? getDashboardSessionFromRequest(req) : null;
+        const isAuthenticated = hasValidToken || Boolean(session);
+        const wantsJsonUnauthorized = pathname.startsWith('/api/') || pathname === '/ws';
+
+        if (dashboardAuthEnabled && !isPublicRoute(pathname, req.method) && hasValidQueryToken) {
+          const cleanParams = new URLSearchParams(url.searchParams);
+          cleanParams.delete('token');
+          const qs = cleanParams.toString();
+          const redirectTo = pathname + (qs ? '?' + qs : '');
+          return new Response(null, {
+            status: 302,
+            headers: {
+              'Location': redirectTo || '/',
+              'Set-Cookie': `token=${queryToken}; Path=/; SameSite=Lax; HttpOnly`,
+            },
+          });
+        }
+
+        if (dashboardAuthEnabled && !isPublicRoute(pathname, req.method)) {
+          if (wantsJsonUnauthorized && !isAuthenticated) {
+            return Response.json({ error: 'Unauthorized' }, { status: 401 });
+          }
+          if (!passwordAuthEnabled && !isAuthenticated) {
+            return new Response(AUTH_ERROR_HTML, {
+              status: 401,
+              headers: { 'Content-Type': 'text/html' },
+            });
+          }
+        }
+
+        
             // Check ?token= query param — set cookie via Set-Cookie and redirect
+        /*
             const queryToken = url.searchParams.get('token');
             if (queryToken && safeCompare(queryToken, self.authToken)) {
               const cleanParams = new URLSearchParams(url.searchParams);
@@ -204,7 +250,8 @@ export class WebSocketServer {
               headers: { 'Content-Type': 'text/html' },
             });
           }
-        }
+        */
+        
 
         // 2. WebSocket upgrade — validate Origin to block cross-origin connections
         //    (e.g., dev server iframes on different ports attempting ws://localhost:3142/ws)
@@ -299,6 +346,12 @@ export class WebSocketServer {
 
         // 5a. Overlay widget (served from ui/ source, not dist/)
         if (pathname === '/overlay' && self.staticDir) {
+          if (dashboardAuthEnabled && !isAuthenticated) {
+            return new Response(AUTH_ERROR_HTML, {
+              status: 401,
+              headers: { 'Content-Type': 'text/html' },
+            });
+          }
           // overlay.html lives in the ui/ source directory (parent of dist/)
           const overlayPath = path.join(self.staticDir, '..', 'overlay.html');
           const overlayFile = Bun.file(overlayPath);
@@ -355,6 +408,9 @@ export class WebSocketServer {
         //    This handles absolute paths (/src/main.tsx, /node_modules/...) that
         //    frameworks emit and that don't match any JARVIS route.
         if (self.siteProxy) {
+          if (dashboardAuthEnabled && !isAuthenticated) {
+            return new Response('Unauthorized', { status: 401 });
+          }
           // WebSocket upgrade (e.g. Vite HMR)
           if (req.headers.get('upgrade')?.toLowerCase() === 'websocket') {
             const targetUrl = self.siteProxy.getWebSocketTargetFromCookie(req, pathname);
