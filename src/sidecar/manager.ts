@@ -434,6 +434,15 @@ export class SidecarManager implements Service {
             unavailableCapabilities: parsed.unavailable_capabilities ?? [],
             connectedAt: new Date(),
           });
+          try {
+            ws.send(JSON.stringify({
+              type: 'sidecar_registered',
+              sidecar_id: sidecarId,
+              timestamp: Date.now(),
+            }));
+          } catch (error) {
+            console.warn(`[SidecarManager] Failed to send registration ack to ${sidecarId}:`, error);
+          }
           return;
         }
         if (parsed.type === 'capabilities_update') {

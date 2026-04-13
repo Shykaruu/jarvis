@@ -381,6 +381,7 @@ test('WebSocketServer - sidecar websocket accepts /sidecar path with bearer auth
     const ws = new WebSocket('ws://localhost:3156/sidecar', {
       headers: { Authorization: 'Bearer sidecar-token' },
     } as any);
+    const received: any[] = [];
 
     const connected = await new Promise<boolean>((resolve) => {
       ws.onopen = () => resolve(true);
@@ -389,6 +390,13 @@ test('WebSocketServer - sidecar websocket accepts /sidecar path with bearer auth
     });
 
     expect(connected).toBe(true);
+    ws.onmessage = (e) => {
+      if (typeof e.data === 'string') {
+        received.push(JSON.parse(e.data));
+      }
+    };
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(received.some(msg => msg.type === 'sidecar_ready')).toBe(true);
     ws.close();
     await new Promise((resolve) => setTimeout(resolve, 100));
   } finally {

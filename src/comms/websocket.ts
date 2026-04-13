@@ -451,6 +451,16 @@ export class WebSocketServer {
           const sidecarId = (ws.data as any)?.sidecar_id as string | undefined;
           if (sidecarId && self.sidecarManager) {
             self.sidecarManager.handleSidecarConnect(ws, sidecarId);
+            try {
+              ws.send(JSON.stringify({
+                type: 'sidecar_ready',
+                sidecar_id: sidecarId,
+                timestamp: Date.now(),
+              }));
+            } catch (error) {
+              console.error('[WebSocketServer] Failed to send sidecar_ready frame:', error);
+              try { ws.close(); } catch { /* ignore */ }
+            }
             return;
           }
 
@@ -518,7 +528,7 @@ export class WebSocketServer {
           }
         },
 
-        close(ws) {
+        close(ws, code, reason) {
           // HMR proxy cleanup
           const proxyUpstream = (ws.data as any)?._proxyUpstream as WebSocket | undefined;
           if (proxyUpstream) {
@@ -528,6 +538,7 @@ export class WebSocketServer {
 
           const sidecarId = (ws.data as any)?.sidecar_id as string | undefined;
           if (sidecarId && self.sidecarManager) {
+            console.log(`[WebSocketServer] Sidecar socket closed: ${sidecarId} (${code}${reason ? `, ${reason}` : ''})`);
             self.sidecarManager.handleSidecarDisconnect(sidecarId);
             return;
           }
