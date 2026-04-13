@@ -704,6 +704,32 @@ export async function runOnboard(): Promise<void> {
     if (port > 0 && port < 65536) config.daemon.port = port;
   }
 
+  console.log('');
+  const existingDashboardPassword = config.dashboard?.password_hash;
+  if (existingDashboardPassword) {
+    const keepPassword = await askYesNo('Dashboard password is already configured. Keep it?', true);
+    if (!keepPassword) {
+      const nextPassword = await askSecret(
+        'Dashboard password (optional, leave blank to keep the panel unsecured)',
+      );
+      config.dashboard = config.dashboard ?? {};
+      config.dashboard.password_hash = nextPassword.trim()
+        ? await Bun.password.hash(nextPassword.trim())
+        : undefined;
+    }
+  } else {
+    const dashboardPassword = await askSecret(
+      'Dashboard password (optional, leave blank to keep the panel unsecured)',
+    );
+    if (dashboardPassword.trim()) {
+      config.dashboard = config.dashboard ?? {};
+      config.dashboard.password_hash = await Bun.password.hash(dashboardPassword.trim());
+    } else {
+      config.dashboard = config.dashboard ?? {};
+      config.dashboard.password_hash = undefined;
+    }
+  }
+
   // ── Save ──────────────────────────────────────────────────────────
 
   console.log('\n' + c.bold('─'.repeat(50)));
@@ -723,6 +749,7 @@ export async function runOnboard(): Promise<void> {
     ['Telegram', config.channels?.telegram?.enabled ? 'enabled' : 'disabled'],
     ['Discord', config.channels?.discord?.enabled ? 'enabled' : 'disabled'],
     ['Authority', `level ${config.authority.default_level}`],
+    ['Dashboard', config.dashboard?.password_hash ? 'password protected' : 'unsecured'],
     ['Keepalive', enableKeepalive ? 'enabled' : 'disabled'],
     ['Port', String(config.daemon.port)],
   ];

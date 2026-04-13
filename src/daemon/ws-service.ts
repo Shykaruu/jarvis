@@ -131,6 +131,10 @@ export class WebSocketService implements Service {
     this.wsServer.setAuthToken(token);
   }
 
+  setDashboardPasswordHash(passwordHash?: string | null): void {
+    this.wsServer.setDashboardPasswordHash(passwordHash);
+  }
+
   async start(): Promise<void> {
     this._status = 'starting';
 

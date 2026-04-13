@@ -24,6 +24,16 @@ import { findEntities, getEntity, searchEntitiesByName } from '../vault/entities
 import { findFacts } from '../vault/facts.ts';
 import { findRelationships, getEntityRelationships } from '../vault/relationships.ts';
 import { getDb } from '../vault/schema.ts';
+import {
+  buildClearedDashboardSessionCookie,
+  buildDashboardSessionCookie,
+  createAuthenticatedDashboardSession,
+  getCookie,
+  getDashboardSessionFromRequest,
+  isDashboardPasswordEnabled,
+  revokeDashboardSessionFromRequest,
+  safeCompare,
+} from '../comms/dashboard-auth.ts';
 import { findCommitments, getUpcoming, createCommitment, getCommitment, updateCommitmentStatus, reorderCommitments } from '../vault/commitments.ts';
 import { getOrCreateConversation, getMessages, getRecentConversation } from '../vault/conversations.ts';
 import { getRecentObservations } from '../vault/observations.ts';
@@ -151,8 +161,8 @@ export function setCorsOrigin(port: number, host = 'localhost') {
   };
 }
 
-function json(data: unknown, status = 200): Response {
-  return Response.json(data, { status, headers: CORS });
+function json(data: unknown, status = 200, headers: Record<string, string> = {}): Response {
+  return Response.json(data, { status, headers: { ...CORS, ...headers } });
 }
 
 function error(message: string, status = 400): Response {
@@ -224,6 +234,65 @@ export function createApiRoutes(ctx: ApiContext): Record<string, unknown> {
     // --- Health ---
     '/api/health': {
       GET: () => json(ctx.healthMonitor.getHealth()),
+    },
+
+    // --- Dashboard Auth ---
+    '/api/auth/session': {
+      GET: (req: Request) => {
+        const passwordEnabled = isDashboardPasswordEnabled(ctx.config);
+        const tokenEnabled = Boolean(ctx.config.auth?.token);
+        const session = passwordEnabled ? getDashboardSessionFromRequest(req) : null;
+        const tokenCookie = tokenEnabled ? getCookie(req, 'token') : null;
+        const tokenAuthenticated = Boolean(
+          tokenEnabled &&
+          ctx.config.auth?.token &&
+          tokenCookie &&
+          safeCompare(tokenCookie, ctx.config.auth.token),
+        );
+        return json({
+          password_enabled: passwordEnabled,
+          token_enabled: tokenEnabled,
+          authenticated: tokenAuthenticated || (passwordEnabled ? Boolean(session) : true),
+          expires_at: session?.expires_at ?? null,
+        });
+      },
+    },
+
+    '/api/auth/login': {
+      POST: async (req: Request) => {
+        if (!isDashboardPasswordEnabled(ctx.config) || !ctx.config.dashboard?.password_hash) {
+          return error('Dashboard password authentication is not configured', 400);
+        }
+
+        try {
+          const body = await req.json() as { password?: string };
+          const password = body.password?.trim() ?? '';
+          if (!password) return error('Password is required', 400);
+
+          const valid = await Bun.password.verify(password, ctx.config.dashboard.password_hash);
+          if (!valid) return error('Invalid password', 401);
+
+          const session = createAuthenticatedDashboardSession();
+          return json({
+            ok: true,
+            authenticated: true,
+            expires_at: session.expires_at,
+          }, 200, {
+            'Set-Cookie': buildDashboardSessionCookie(req, session.id, session.expires_at),
+          });
+        } catch {
+          return error('Invalid request body');
+        }
+      },
+    },
+
+    '/api/auth/logout': {
+      POST: (req: Request) => {
+        revokeDashboardSessionFromRequest(req);
+        return json({ ok: true }, 200, {
+          'Set-Cookie': buildClearedDashboardSessionCookie(req),
+        });
+      },
     },
 
     // --- Vault: Entities ---
@@ -774,7 +843,66 @@ export function createApiRoutes(ctx: ApiContext): Record<string, unknown> {
           authority: config.authority,
           heartbeat: config.heartbeat,
           active_role: config.active_role,
+          dashboard: {
+            password_enabled: isDashboardPasswordEnabled(config),
+          },
         });
+      },
+    },
+
+    '/api/config/dashboard-auth': {
+      GET: () => {
+        return json({
+          password_enabled: isDashboardPasswordEnabled(ctx.config),
+        });
+      },
+      POST: async (req: Request) => {
+        try {
+          const body = await req.json() as { password?: string; disable?: boolean };
+          const disable = body.disable === true;
+          const nextPassword = body.password?.trim() ?? '';
+
+          if (!disable && nextPassword.length === 0) {
+            return error('Password is required unless disabling dashboard protection.');
+          }
+
+          const { loadConfig, saveConfig } = await import('../config/loader.ts');
+          const freshConfig = await loadConfig();
+          freshConfig.dashboard = freshConfig.dashboard ?? {};
+
+          if (disable) {
+            freshConfig.dashboard.password_hash = undefined;
+            await saveConfig(freshConfig);
+            ctx.config.dashboard = freshConfig.dashboard;
+            ctx.wsService?.setDashboardPasswordHash(undefined);
+            revokeDashboardSessionFromRequest(req);
+            return json({
+              ok: true,
+              password_enabled: false,
+              message: 'Dashboard password disabled.',
+            }, 200, {
+              'Set-Cookie': buildClearedDashboardSessionCookie(req),
+            });
+          }
+
+          freshConfig.dashboard.password_hash = await Bun.password.hash(nextPassword);
+          await saveConfig(freshConfig);
+          ctx.config.dashboard = freshConfig.dashboard;
+          ctx.wsService?.setDashboardPasswordHash(freshConfig.dashboard.password_hash);
+
+          const session = createAuthenticatedDashboardSession();
+          return json({
+            ok: true,
+            password_enabled: true,
+            message: 'Dashboard password saved.',
+            expires_at: session.expires_at,
+          }, 200, {
+            'Set-Cookie': buildDashboardSessionCookie(req, session.id, session.expires_at),
+          });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          return error(`Failed to save dashboard password: ${msg}`, 500);
+        }
       },
     },
 

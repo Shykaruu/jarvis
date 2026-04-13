@@ -7,6 +7,7 @@ export async function api<T>(
   opts?: RequestInit
 ): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
+    credentials: "same-origin",
     headers: { "Content-Type": "application/json", ...opts?.headers },
     ...opts,
   });
