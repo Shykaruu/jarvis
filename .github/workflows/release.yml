@@ -129,7 +129,7 @@ jobs:
 
           # Update optionalDependencies versions
           for platform in darwin-arm64 darwin-x64 linux-x64 linux-arm64 win32-x64; do
-            sed -i "s|\"@usejarvis/sidecar-${platform}\": \".*\"|\"@usejarvis/sidecar-${platform}\": \"${VERSION}\"|" package.json
+            sed -i "s|\"@shykaruu/jarvis-sidecar-${platform}\": \".*\"|\"@shykaruu/jarvis-sidecar-${platform}\": \"${VERSION}\"|" package.json
           done
 
       - name: Setup npm auth
@@ -142,7 +142,7 @@ jobs:
           if echo "${{ steps.version.outputs.VERSION }}" | grep -q '-'; then FLAGS="$FLAGS --tag next"; fi
 
           for platform in darwin-arm64 darwin-x64 linux-x64 linux-arm64 win32-x64; do
-            echo "Publishing @usejarvis/sidecar-${platform}... ${FLAGS}"
+            echo "Publishing @shykaruu/jarvis-sidecar-${platform}... ${FLAGS}"
             cd "sidecar/npm/${platform}"
             npm publish --access public $FLAGS
             cd "$GITHUB_WORKSPACE"
