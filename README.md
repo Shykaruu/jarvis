@@ -204,7 +204,7 @@ This means you can run the daemon on an always-on server and still interact with
 **Via bun:**
 
 ```bash
-bun install -g @usejarvis/sidecar
+bun install -g @shykaruu/jarvis-sidecar
 ```
 
 **Or download the binary** from [GitHub Releases](https://github.com/vierisid/jarvis/releases) for your platform (macOS, Linux, Windows).
@@ -231,6 +231,8 @@ jarvis-sidecar
 ```
 
 Once connected, the sidecar appears as online in the Settings page where you can configure its capabilities (terminal, filesystem, desktop, browser, clipboard, screenshot, awareness).
+
+If your daemon is hosted remotely behind DNS/TLS or a reverse proxy, set `daemon.brain_url` in `~/.jarvis/config.yaml` so sidecar enrollment tokens point at the correct WebSocket endpoint. If unset, JARVIS preserves the existing localhost fallback.
 
 ---
 
@@ -291,6 +293,8 @@ daemon:
   port: 3142
   data_dir: "~/.jarvis"
   db_path: "~/.jarvis/jarvis.db"
+  # Optional full sidecar WebSocket URL for remote deployments
+  # brain_url: "wss://your-domain.example/sidecar"
 
 llm:
   primary: "anthropic"

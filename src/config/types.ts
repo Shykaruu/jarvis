@@ -139,6 +139,8 @@ export type JarvisConfig = {
     port: number;
     data_dir: string;
     db_path: string;
+    /** Full sidecar WebSocket URL (preferred). Example: wss://host/sidecar */
+    brain_url?: string;
     /** External domain for the brain (used in sidecar JWT tokens). Env: JARVIS_BRAIN_DOMAIN */
     brain_domain?: string;
   };

@@ -5,6 +5,11 @@ daemon:
   port: 3142
   data_dir: "~/.jarvis"
   db_path: "~/.jarvis/jarvis.db"
+  # Preferred for remote sidecars: full WebSocket URL the sidecar should use.
+  # Example: "wss://your-domain.example/sidecar"
+  # brain_url: "wss://your-domain.example/sidecar"
+  # Legacy fallback: host[:port] only. The daemon derives /sidecar/connect from this.
+  # brain_domain: "your-domain.example"
 
 # Authentication — protects dashboard, API, and WebSocket.
 # If unset, the application is open (no auth).

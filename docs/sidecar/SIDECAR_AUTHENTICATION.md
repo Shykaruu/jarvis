@@ -30,6 +30,8 @@ Brain (VPS)                              Sidecar (User PC)
 
 The brain uses a single **ES256 (ECDSA P-256)** key pair for signing all sidecar enrollment tokens.
 
+For remote deployments, set `daemon.brain_url` in the brain config to the full sidecar WebSocket URL (for example `wss://your-domain.example/sidecar`). If unset, the brain preserves the existing localhost-style fallback derived from the daemon port.
+
 - **Algorithm:** ES256 (ECDSA with P-256 curve and SHA-256)
 - **Purpose:** The private key signs JWTs; the public key allows sidecars to verify token authenticity
 - **Storage:** `{data_dir}/sidecar-keys/private.pem` and `{data_dir}/sidecar-keys/public.pem`
@@ -58,7 +60,7 @@ The brain creates a signed JWT containing:
   "jti": "<unique-token-id>",
   "sid": "<sidecar-uuid>",
   "name": "home-desktop",
-  "brain": "wss://shiny-panda.domain.com/sidecar/connect",
+  "brain": "wss://shiny-panda.domain.com/sidecar",
   "jwks": "https://shiny-panda.domain.com/api/sidecars/.well-known/jwks.json",
   "iat": 1709740800
 }
@@ -97,7 +99,7 @@ This ensures the token was signed by the real brain and hasn't been tampered wit
 The sidecar opens a WebSocket connection to the `brain` URL from the JWT, passing the token in the `Authorization` header:
 
 ```
-GET wss://shiny-panda.domain.com/sidecar/connect
+GET wss://shiny-panda.domain.com/sidecar
 Authorization: Bearer <jwt>
 ```
 
