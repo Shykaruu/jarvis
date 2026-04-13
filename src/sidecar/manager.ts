@@ -318,8 +318,12 @@ export class SidecarManager implements Service {
 
   /** Update last_seen_at for a sidecar */
   touchSidecar(id: string): void {
-    const db = getDb();
-    db.run("UPDATE sidecars SET last_seen_at = datetime('now') WHERE id = ?", [id]);
+    try {
+      const db = getDb();
+      db.run("UPDATE sidecars SET last_seen_at = datetime('now') WHERE id = ?", [id]);
+    } catch (error) {
+      console.warn(`[SidecarManager] Failed to persist last_seen_at for ${id}:`, error);
+    }
   }
 
   // --------------- Connection Tracking ---------------
@@ -327,12 +331,16 @@ export class SidecarManager implements Service {
   /** Register a connected sidecar (called after WS handshake + registration message) */
   registerConnection(sidecar: ConnectedSidecar): void {
     this.connected.set(sidecar.id, sidecar);
-    // Persist connection details to DB so they're available even when offline
-    const db = getDb();
-    db.run(
-      `UPDATE sidecars SET last_seen_at = datetime('now'), hostname = ?, os = ?, platform = ?, capabilities = ? WHERE id = ?`,
-      [sidecar.hostname, sidecar.os, sidecar.platform, JSON.stringify(sidecar.capabilities), sidecar.id],
-    );
+    try {
+      // Persist connection details to DB so they're available even when offline
+      const db = getDb();
+      db.run(
+        `UPDATE sidecars SET last_seen_at = datetime('now'), hostname = ?, os = ?, platform = ?, capabilities = ? WHERE id = ?`,
+        [sidecar.hostname, sidecar.os, sidecar.platform, JSON.stringify(sidecar.capabilities), sidecar.id],
+      );
+    } catch (error) {
+      console.warn(`[SidecarManager] Failed to persist sidecar connection metadata for ${sidecar.id}:`, error);
+    }
     console.log(`[SidecarManager] Sidecar connected: ${sidecar.name} (${sidecar.id})`);
   }
 
@@ -352,8 +360,12 @@ export class SidecarManager implements Service {
       conn.capabilities = capabilities;
       conn.unavailableCapabilities = unavailableCapabilities;
     }
-    const db = getDb();
-    db.run('UPDATE sidecars SET capabilities = ? WHERE id = ?', [JSON.stringify(capabilities), sidecarId]);
+    try {
+      const db = getDb();
+      db.run('UPDATE sidecars SET capabilities = ? WHERE id = ?', [JSON.stringify(capabilities), sidecarId]);
+    } catch (error) {
+      console.warn(`[SidecarManager] Failed to persist capabilities for ${sidecarId}:`, error);
+    }
     console.log(`[SidecarManager] Capabilities updated for ${sidecarId}: ${capabilities.join(', ')}`);
     if (unavailableCapabilities.length > 0) {
       console.log(`[SidecarManager] Unavailable: ${unavailableCapabilities.map(u => u.name).join(', ')}`);

@@ -5,6 +5,15 @@ import { rm } from 'node:fs/promises';
 import { closeDb, initDatabase } from '../vault/schema.ts';
 import { resolveSidecarEndpoints, SidecarManager } from './manager.ts';
 
+function createFakeServerWebSocket() {
+  return {
+    send() {},
+    ping() {},
+    close() {},
+    data: {},
+  } as any;
+}
+
 describe('resolveSidecarEndpoints', () => {
   test('preserves configured websocket URL and derives JWKS URL', () => {
     const endpoints = resolveSidecarEndpoints('wss://axiom-er.ddns.net/sidecar');
@@ -54,6 +63,51 @@ describe('SidecarManager enrollment', () => {
 
     expect(payload.brain).toBe('wss://axiom-er.ddns.net/sidecar');
     expect(payload.jwks).toBe('https://axiom-er.ddns.net/api/sidecars/.well-known/jwks.json');
+
+    await manager.stop();
+  });
+
+  test('keeps sidecar websocket open when touchSidecar persistence fails', async () => {
+    const manager = new SidecarManager(dataDir);
+    manager.setBrainUrl('wss://axiom-er.ddns.net/sidecar/connect');
+    await manager.start();
+
+    const result = await manager.enrollSidecar('resilient-touch');
+    const claims = JSON.parse(Buffer.from(result.token.split('.')[1]!, 'base64url').toString('utf8')) as {
+      sid: string;
+    };
+
+    closeDb();
+
+    expect(() => manager.handleSidecarConnect(createFakeServerWebSocket(), claims.sid)).not.toThrow();
+    expect((manager as any).sidecarConnections.has(claims.sid)).toBe(true);
+
+    await manager.stop();
+  });
+
+  test('keeps registered sidecar connected when metadata persistence fails', async () => {
+    const manager = new SidecarManager(dataDir);
+    manager.setBrainUrl('wss://axiom-er.ddns.net/sidecar/connect');
+    await manager.start();
+
+    const result = await manager.enrollSidecar('resilient-register');
+    const claims = JSON.parse(Buffer.from(result.token.split('.')[1]!, 'base64url').toString('utf8')) as {
+      sid: string;
+    };
+
+    closeDb();
+
+    expect(() => manager.registerConnection({
+      id: claims.sid,
+      name: 'resilient-register',
+      hostname: 'probe-host',
+      os: 'windows',
+      platform: 'amd64',
+      capabilities: ['terminal'],
+      unavailableCapabilities: [],
+      connectedAt: new Date(),
+    })).not.toThrow();
+    expect(manager.isConnected(claims.sid)).toBe(true);
 
     await manager.stop();
   });
