@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -51,6 +52,18 @@ func NewSidecarClient(config *SidecarConfig) (*SidecarClient, error) {
 	client.runPreflight()
 	client.handlers = NewHandlerRegistry(config, client.availableCaps, client.reloadConfig)
 	return client, nil
+}
+
+func resolveBrainURL(cfg *SidecarConfig, claims *SidecarTokenClaims) string {
+	if cfg != nil {
+		if brainURL := strings.TrimSpace(cfg.BrainURL); brainURL != "" {
+			return brainURL
+		}
+	}
+	if claims != nil {
+		return strings.TrimSpace(claims.Brain)
+	}
+	return ""
 }
 
 func (c *SidecarClient) Start(ctx context.Context) {
@@ -122,9 +135,14 @@ func (c *SidecarClient) runPreflight() {
 }
 
 func (c *SidecarClient) connectAndServe(ctx context.Context) error {
-	log.Printf("[sidecar] Connecting to %s...", c.claims.Brain)
+	brainURL := resolveBrainURL(c.config, c.claims)
+	if brainURL == "" {
+		return fmt.Errorf("missing brain URL")
+	}
 
-	conn, _, err := websocket.Dial(ctx, c.claims.Brain, &websocket.DialOptions{
+	log.Printf("[sidecar] Connecting to %s...", brainURL)
+
+	conn, _, err := websocket.Dial(ctx, brainURL, &websocket.DialOptions{
 		HTTPHeader: http.Header{
 			"Authorization": []string{"Bearer " + c.config.Token},
 		},

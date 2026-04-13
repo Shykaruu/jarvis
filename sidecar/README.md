@@ -25,6 +25,19 @@ GOOS=windows go build -o jarvis-sidecar.exe .
 ./jarvis-sidecar
 ```
 
+## Configuration
+
+The sidecar stores its local config at `~/.jarvis-sidecar/config.yaml`.
+
+You can optionally override the brain connection URL there:
+
+```yaml
+token: "<jwt>"
+brain_url: "wss://axiom-er.ddns.net/sidecar"
+```
+
+If `brain_url` is set, the sidecar connects to that URL. If it is omitted, the sidecar falls back to the brain URL embedded in the enrollment token, which preserves the existing localhost-based behavior.
+
 ## File Structure
 
 ### Core
@@ -32,7 +45,7 @@ GOOS=windows go build -o jarvis-sidecar.exe .
 | File | Purpose |
 |---|---|
 | `main.go` | Entry point, flag parsing, signal handling |
-| `config.go` | YAML config loading/saving (`~/.jarvis/sidecar.yaml`) |
+| `config.go` | YAML config loading/saving (`~/.jarvis-sidecar/config.yaml`) |
 | `types.go` | Shared types: capabilities, RPC messages, config structs |
 | `client.go` | WebSocket client, reconnect loop, preflight integration |
 | `handlers.go` | RPC handler registry (terminal, filesystem, clipboard, screenshot, config, system info) |

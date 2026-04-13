@@ -293,6 +293,7 @@ func handleCaptureScreen(params map[string]any) (*RPCResult, error) {
 func makeGetConfigHandler(cfg *SidecarConfig) RPCHandler {
 	return func(params map[string]any) (*RPCResult, error) {
 		return &RPCResult{Result: map[string]any{
+			"brain_url": cfg.BrainURL,
 			"capabilities": cfg.Capabilities,
 			"terminal": map[string]any{
 				"blocked_commands": cfg.Terminal.BlockedCommands,
@@ -321,6 +322,10 @@ func makeUpdateConfigHandler(cfg *SidecarConfig, onReloaded func()) RPCHandler {
 	getConfig := makeGetConfigHandler(cfg)
 
 	return func(params map[string]any) (*RPCResult, error) {
+		if v, ok := params["brain_url"].(string); ok {
+			cfg.BrainURL = strings.TrimSpace(v)
+		}
+
 		// Update capabilities
 		if caps, ok := params["capabilities"].([]any); ok {
 			newCaps := make([]SidecarCapability, 0, len(caps))

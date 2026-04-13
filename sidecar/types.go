@@ -95,6 +95,7 @@ type SidecarCapabilitiesUpdate struct {
 // SidecarConfig is the YAML config file structure.
 type SidecarConfig struct {
 	Token        string              `yaml:"token"`
+	BrainURL     string              `yaml:"brain_url"`
 	Capabilities []SidecarCapability `yaml:"capabilities"`
 	Terminal     TerminalConfig      `yaml:"terminal"`
 	Filesystem   FilesystemConfig    `yaml:"filesystem"`

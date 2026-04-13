@@ -62,6 +62,8 @@ func LoadConfig() (*SidecarConfig, error) {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
 
+	cfg.BrainURL = strings.TrimSpace(cfg.BrainURL)
+
 	// Ensure defaults for zero values
 	if cfg.Terminal.TimeoutMs == 0 {
 		cfg.Terminal.TimeoutMs = 30000
@@ -97,6 +99,7 @@ func SaveConfig(cfg *SidecarConfig) error {
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return err
 	}
+	cfg.BrainURL = strings.TrimSpace(cfg.BrainURL)
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		return err
