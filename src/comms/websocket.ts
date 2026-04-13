@@ -257,10 +257,6 @@ export class WebSocketServer {
         //    (e.g., dev server iframes on different ports attempting ws://localhost:3142/ws)
         if (pathname === '/ws') {
           const origin = req.headers.get('origin');
-          const expectedOrigin = self.corsOrigin || `http://localhost:${self.port}`;
-          if (origin && origin !== expectedOrigin) {
-            return new Response('Forbidden: origin mismatch', { status: 403 });
-          }
           const success = server.upgrade(req, { data: {} });
           if (success) return undefined;
           return new Response('WebSocket upgrade failed', { status: 500 });
