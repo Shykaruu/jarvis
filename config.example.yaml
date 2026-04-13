@@ -35,6 +35,8 @@ llm:
   openai:
     api_key: "sk-..."
     model: "gpt-4o"
+    # Optional OpenAI-compatible API base URL for gateways/proxies.
+    # base_url: "https://your-openai-compatible-api-base"
 
   # Groq (OpenAI-compatible) configuration
   # groq:
@@ -89,6 +91,8 @@ tts:
 #   provider: "openai"         # openai, groq, or local
 #   openai:
 #     api_key: "sk-..."
+#     # Optional OpenAI-compatible API base URL
+#     # base_url: "https://your-openai-compatible-api-base"
 
 # Active role (must match a filename in roles/ without extension)
 active_role: "personal-assistant"

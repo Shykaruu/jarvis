@@ -344,7 +344,8 @@ export class AgentService implements Service, IAgentService {
     if (llm.openai?.api_key) {
       const provider = new OpenAIProvider(
         llm.openai.api_key,
-        llm.openai.model
+        llm.openai.model,
+        llm.openai.base_url,
       );
       this.llmManager.registerProvider(provider);
       hasProvider = true;

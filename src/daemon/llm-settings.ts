@@ -29,6 +29,7 @@ const SETTING_PRIMARY = 'llm.primary';
 const SETTING_FALLBACK = 'llm.fallback';
 const SETTING_ANTHROPIC_MODEL = 'llm.anthropic.model';
 const SETTING_OPENAI_MODEL = 'llm.openai.model';
+const SETTING_OPENAI_BASE_URL = 'llm.openai.base_url';
 const SETTING_GROQ_MODEL = 'llm.groq.model';
 const SETTING_GEMINI_MODEL = 'llm.gemini.model';
 const SETTING_OLLAMA_MODEL = 'llm.ollama.model';
@@ -39,7 +40,7 @@ export type LLMSettingsResponse = {
   primary: string;
   fallback: string[];
   anthropic: { model: string; has_api_key: boolean } | null;
-  openai: { model: string; has_api_key: boolean } | null;
+  openai: { model: string; has_api_key: boolean; base_url?: string } | null;
   groq: { model: string; has_api_key: boolean } | null;
   gemini: { model: string; has_api_key: boolean } | null;
   ollama: { base_url: string; model: string } | null;
@@ -57,6 +58,7 @@ export function getLLMSettings(config: JarvisConfig): LLMSettingsResponse {
 
   const anthropicModel = getSetting(SETTING_ANTHROPIC_MODEL) ?? config.llm.anthropic?.model ?? 'claude-sonnet-4-6';
   const openaiModel = getSetting(SETTING_OPENAI_MODEL) ?? config.llm.openai?.model ?? 'gpt-5.4';
+  const openaiBaseUrl = getSetting(SETTING_OPENAI_BASE_URL) ?? config.llm.openai?.base_url;
   const groqModel = getSetting(SETTING_GROQ_MODEL) ?? config.llm.groq?.model ?? 'llama-3.3-70b-versatile';
   const geminiModel = getSetting(SETTING_GEMINI_MODEL) ?? config.llm.gemini?.model ?? 'gemini-3-flash-preview';
   const ollamaModel = getSetting(SETTING_OLLAMA_MODEL) ?? config.llm.ollama?.model ?? 'llama3';
@@ -74,7 +76,7 @@ export function getLLMSettings(config: JarvisConfig): LLMSettingsResponse {
     primary,
     fallback,
     anthropic: { model: anthropicModel, has_api_key: hasAnthropicKey },
-    openai: { model: openaiModel, has_api_key: hasOpenaiKey },
+    openai: { model: openaiModel, has_api_key: hasOpenaiKey, ...(openaiBaseUrl ? { base_url: openaiBaseUrl } : {}) },
     groq: { model: groqModel, has_api_key: hasGroqKey },
     gemini: { model: geminiModel, has_api_key: hasGeminiKey },
     ollama: { base_url: ollamaBaseUrl, model: ollamaModel },
@@ -91,7 +93,7 @@ export function saveLLMSettings(
     primary?: string;
     fallback?: string[];
     anthropic?: { api_key?: string; model?: string };
-    openai?: { api_key?: string; model?: string };
+    openai?: { api_key?: string; model?: string; base_url?: string };
     groq?: { api_key?: string; model?: string };
     gemini?: { api_key?: string; model?: string };
     ollama?: { base_url?: string; model?: string };
@@ -125,8 +127,26 @@ export function saveLLMSettings(
 
   // OpenAI
   if (body.openai) {
+    if (body.openai.base_url !== undefined) {
+      const trimmedBaseUrl = body.openai.base_url.trim();
+      if (trimmedBaseUrl) {
+        try {
+          new URL(trimmedBaseUrl);
+        } catch {
+          throw new Error(`Invalid OpenAI base URL: ${trimmedBaseUrl}`);
+        }
+      }
+    }
     if (body.openai.model) {
       setSetting(SETTING_OPENAI_MODEL, body.openai.model);
+    }
+    if (body.openai.base_url !== undefined) {
+      const trimmedBaseUrl = body.openai.base_url.trim();
+      if (trimmedBaseUrl) {
+        setSetting(SETTING_OPENAI_BASE_URL, trimmedBaseUrl);
+      } else {
+        setSetting(SETTING_OPENAI_BASE_URL, '');
+      }
     }
     if (body.openai.api_key) {
       setSecret(KEY_OPENAI, body.openai.api_key);
@@ -134,6 +154,9 @@ export function saveLLMSettings(
     config.llm.openai = {
       ...config.llm.openai,
       model: body.openai.model ?? config.llm.openai?.model,
+      base_url: body.openai.base_url !== undefined
+        ? (body.openai.base_url.trim() || undefined)
+        : config.llm.openai?.base_url,
       api_key: body.openai.api_key ?? getOpenAIApiKey(config) ?? '',
     };
   }
@@ -261,14 +284,18 @@ export function mergeLLMSettingsIntoConfig(config: JarvisConfig): void {
 
   // OpenAI
   const dbOpenaiModel = getSetting(SETTING_OPENAI_MODEL);
+  const dbOpenaiBaseUrl = getSetting(SETTING_OPENAI_BASE_URL);
   const keychainOpenaiKey = getSecret(KEY_OPENAI);
-  if (dbOpenaiModel || keychainOpenaiKey) {
+  if (dbOpenaiModel || dbOpenaiBaseUrl !== null || keychainOpenaiKey) {
     config.llm.openai = {
       ...config.llm.openai,
       api_key: (!process.env.JARVIS_OPENAI_KEY && keychainOpenaiKey)
         ? keychainOpenaiKey
         : (config.llm.openai?.api_key ?? ''),
       model: dbOpenaiModel ?? config.llm.openai?.model,
+      base_url: dbOpenaiBaseUrl !== null
+        ? (dbOpenaiBaseUrl || undefined)
+        : config.llm.openai?.base_url,
     };
   }
 
@@ -338,7 +365,7 @@ export function hotReloadLLMProviders(config: JarvisConfig, llmManager: LLMManag
     console.log('[LLM] Hot-reloaded Anthropic provider');
   }
   if (llm.openai?.api_key) {
-    providers.push(new OpenAIProvider(llm.openai.api_key, llm.openai.model));
+    providers.push(new OpenAIProvider(llm.openai.api_key, llm.openai.model, llm.openai.base_url));
     console.log('[LLM] Hot-reloaded OpenAI provider');
   }
   if (llm.groq?.api_key) {
@@ -386,7 +413,11 @@ export async function testLLMProvider(
     } else if (opts.provider === 'openai') {
       const key = opts.api_key || getSecret(KEY_OPENAI) || config.llm.openai?.api_key;
       if (!key) return { ok: false, error: 'API key required' };
-      instance = new OpenAIProvider(key, opts.model ?? config.llm.openai?.model);
+      instance = new OpenAIProvider(
+        key,
+        opts.model ?? config.llm.openai?.model,
+        opts.base_url ?? config.llm.openai?.base_url,
+      );
     } else if (opts.provider === 'groq') {
       const key = opts.api_key || getSecret(KEY_GROQ) || config.llm.groq?.api_key;
       if (!key) return { ok: false, error: 'API key required' };

@@ -94,6 +94,7 @@ llm: {
   openai?: {
     api_key: string;
     model?: string;      // Default: gpt-4o
+    base_url?: string;   // Optional OpenAI-compatible API base URL
   };
 
   // Ollama (local models) configuration
@@ -168,6 +169,7 @@ llm:
   openai:
     api_key: ""
     model: "gpt-4o"
+    # base_url: "https://your-openai-compatible-api-base"
   ollama:
     base_url: "http://localhost:11434"
     model: "llama3"

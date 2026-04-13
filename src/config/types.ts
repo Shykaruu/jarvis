@@ -25,7 +25,7 @@ export type ChannelConfig = {
 
 export type STTConfig = {
   provider: 'openai' | 'groq' | 'local';
-  openai?: { api_key: string; model?: string };
+  openai?: { api_key: string; model?: string; base_url?: string };
   groq?: { api_key: string; model?: string };
   local?: { endpoint: string; model?: string; server_type?: 'whisper_cpp' | 'openai_compatible' };
 };
@@ -154,7 +154,7 @@ export type JarvisConfig = {
     primary: string;  // provider name
     fallback: string[];
     anthropic?: { api_key: string; model?: string };
-    openai?: { api_key: string; model?: string };
+    openai?: { api_key: string; model?: string; base_url?: string };
     groq?: { api_key: string; model?: string };
     gemini?: { api_key: string; model?: string };
     ollama?: { base_url?: string; model?: string };

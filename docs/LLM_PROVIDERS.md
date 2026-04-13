@@ -156,7 +156,8 @@ import { OpenAIProvider } from './llm/index.ts';
 
 const provider = new OpenAIProvider(
   'sk-...',           // API key
-  'gpt-4o'            // Model (optional)
+  'gpt-4o',           // Model (optional)
+  'https://api.openai.com/v1/' // Optional OpenAI-compatible API base URL
 );
 ```
 
@@ -166,12 +167,13 @@ const provider = new OpenAIProvider(
 - `gpt-4` - Original GPT-4
 - `gpt-3.5-turbo` - Fastest, cheapest
 
-**API Endpoint**: `https://api.openai.com/v1/chat/completions`
+**API Endpoint**: `https://api.openai.com/v1/chat/completions` by default, or a user-supplied OpenAI-compatible API base URL
 
 **Special Features**:
 - Function calling
 - JSON mode
 - Vision capabilities (gpt-4o)
+- Compatible with OpenAI-style gateways and proxies via optional `base_url`
 
 ### Ollama (Local Models)
 
@@ -229,6 +231,8 @@ llm:
   openai:
     api_key: "sk-..."
     model: "gpt-4o"
+    # Optional OpenAI-compatible API base URL
+    # base_url: "https://your-openai-compatible-api-base"
 
   ollama:
     base_url: "http://localhost:11434"
