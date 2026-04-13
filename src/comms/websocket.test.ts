@@ -363,6 +363,39 @@ test('WebSocketServer - WebSocket allowed with auth cookie', async () => {
   }
 });
 
+test('WebSocketServer - sidecar websocket accepts /sidecar path with bearer auth', async () => {
+  const authServer = new WebSocketServer(3156);
+  authServer.setSidecarManager({
+    async validateToken(token: string) {
+      if (token === 'sidecar-token') {
+        return { sid: 'sidecar-123' } as any;
+      }
+      return null;
+    },
+    handleSidecarConnect() {},
+    handleSidecarDisconnect() {},
+  } as any);
+  authServer.start();
+
+  try {
+    const ws = new WebSocket('ws://localhost:3156/sidecar', {
+      headers: { Authorization: 'Bearer sidecar-token' },
+    } as any);
+
+    const connected = await new Promise<boolean>((resolve) => {
+      ws.onopen = () => resolve(true);
+      ws.onerror = () => resolve(false);
+      setTimeout(() => resolve(false), 2000);
+    });
+
+    expect(connected).toBe(true);
+    ws.close();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  } finally {
+    authServer.stop();
+  }
+});
+
 test('WebSocketServer - sendToClient unicasts JSON', async () => {
   let serverWsRef: any = null;
 

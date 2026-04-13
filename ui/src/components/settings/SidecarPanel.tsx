@@ -24,7 +24,7 @@ type SidecarInfo = {
 export function SidecarPanel() {
   const { data: sidecars, loading, refetch } = useApiData<SidecarInfo[]>("/api/sidecars", []);
   const [enrollName, setEnrollName] = useState("");
-  const [enrollResult, setEnrollResult] = useState<{ token: string; name: string } | null>(null);
+  const [enrollResult, setEnrollResult] = useState<{ token: string; name: string; brainUrl: string } | null>(null);
   const [error, setError] = useState("");
   const [enrolling, setEnrolling] = useState(false);
   const [configTarget, setConfigTarget] = useState<{ id: string; name: string } | null>(null);
@@ -45,7 +45,7 @@ export function SidecarPanel() {
         throw new Error(data.error || "Enrollment failed");
       }
       const data = await res.json();
-      setEnrollResult({ token: data.token, name: enrollName.trim() });
+      setEnrollResult({ token: data.token, name: enrollName.trim(), brainUrl: data.brain_url });
       setEnrollName("");
       refetch();
     } catch (err: any) {
@@ -102,6 +102,9 @@ export function SidecarPanel() {
             Token for "{enrollResult.name}" — copy and run on the target machine:
           </div>
           <code style={codeStyle}>jarvis-sidecar --token {enrollResult.token.slice(0, 40)}...</code>
+          <div style={{ fontSize: "11px", color: "var(--j-text-dim)", marginTop: "8px", wordBreak: "break-all" }}>
+            Connect URL: {enrollResult.brainUrl}
+          </div>
           <button onClick={copyToken} style={{ ...buttonStyle, marginTop: "8px", fontSize: "11px" }}>
             Copy Full Token
           </button>

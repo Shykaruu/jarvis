@@ -63,7 +63,11 @@ export class SidecarManager implements Service {
    * Example: "shiny-panda.domain.com" or "localhost:3142"
    */
   setBrainUrl(url: string): void {
-    this.brainUrl = url;
+    this.brainUrl = url.trim();
+  }
+
+  getConfiguredBrainUrl(): string {
+    return this.brainUrl;
   }
 
   // --------------- Service Interface ---------------
@@ -227,7 +231,7 @@ export class SidecarManager implements Service {
   /**
    * Enroll a new sidecar. Returns the signed JWT enrollment token.
    */
-  async enrollSidecar(name: string): Promise<{ token: string; sidecar: SidecarRecord }> {
+  async enrollSidecar(name: string): Promise<{ token: string; sidecar: SidecarRecord; brain_url: string }> {
     if (!this.privateKey) throw new Error('SidecarManager not started');
     if (!this.brainUrl) throw new Error('Brain URL not configured — call setBrainUrl() first');
 
@@ -250,13 +254,7 @@ export class SidecarManager implements Service {
     const id = generateId();
     const tokenId = generateId();
 
-    // Determine protocol based on brain URL
-    const isSecure = !this.brainUrl.includes('localhost') && !this.brainUrl.match(/:\d+$/);
-    const wsProtocol = isSecure ? 'wss' : 'ws';
-    const httpProtocol = isSecure ? 'https' : 'http';
-
-    const brainWs = `${wsProtocol}://${this.brainUrl}/sidecar/connect`;
-    const jwksUrl = `${httpProtocol}://${this.brainUrl}/api/sidecars/.well-known/jwks.json`;
+    const { brainWs, jwksUrl } = resolveSidecarEndpoints(this.brainUrl);
 
     // Sign JWT
     const token = await new SignJWT({
@@ -280,7 +278,7 @@ export class SidecarManager implements Service {
     const sidecar = db.query('SELECT * FROM sidecars WHERE id = ?').get(id) as SidecarRecord;
     console.log(`[SidecarManager] Enrolled sidecar "${trimmed}" (${id})`);
 
-    return { token, sidecar };
+    return { token, sidecar, brain_url: brainWs };
   }
 
   // --------------- Registry (DB queries) ---------------
@@ -538,5 +536,47 @@ export class SidecarManager implements Service {
       unavailable_capabilities: conn?.unavailableCapabilities,
     };
   }
+}
+
+export function resolveSidecarEndpoints(configuredBrainUrl: string): { brainWs: string; jwksUrl: string } {
+  const raw = configuredBrainUrl.trim();
+  if (!raw) {
+    throw new Error('Brain URL not configured');
+  }
+
+  if (!raw.includes('://')) {
+    const isLocalHost = raw.startsWith('localhost') || raw.startsWith('127.0.0.1') || raw.startsWith('[::1]');
+    const isSecure = !isLocalHost && !raw.match(/:\d+$/);
+    const protocol = isSecure ? 'wss' : 'ws';
+    const httpProtocol = isSecure ? 'https' : 'http';
+    return {
+      brainWs: `${protocol}://${raw}/sidecar/connect`,
+      jwksUrl: `${httpProtocol}://${raw}/api/sidecars/.well-known/jwks.json`,
+    };
+  }
+
+  const brainWsUrl = new URL(raw);
+  if (brainWsUrl.protocol === 'http:') {
+    brainWsUrl.protocol = 'ws:';
+  } else if (brainWsUrl.protocol === 'https:') {
+    brainWsUrl.protocol = 'wss:';
+  } else if (brainWsUrl.protocol !== 'ws:' && brainWsUrl.protocol !== 'wss:') {
+    throw new Error(`Unsupported brain_url protocol: ${brainWsUrl.protocol}`);
+  }
+
+  if (!brainWsUrl.pathname || brainWsUrl.pathname === '/') {
+    brainWsUrl.pathname = '/sidecar/connect';
+  }
+
+  const jwksUrl = new URL(brainWsUrl.toString());
+  jwksUrl.protocol = brainWsUrl.protocol === 'wss:' ? 'https:' : 'http:';
+  jwksUrl.pathname = '/api/sidecars/.well-known/jwks.json';
+  jwksUrl.search = '';
+  jwksUrl.hash = '';
+
+  return {
+    brainWs: brainWsUrl.toString(),
+    jwksUrl: jwksUrl.toString(),
+  };
 }
 

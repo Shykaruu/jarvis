@@ -38,6 +38,7 @@ const TOKEN_STRIP_SCRIPT = `<script>(function(){var h=location.hash,i=h.indexOf(
 function isPublicRoute(pathname: string, method: string): boolean {
   return (
     pathname === '/health' ||
+    pathname === '/sidecar' ||
     pathname === '/sidecar/connect' ||
     pathname === '/api/sidecars/.well-known/jwks.json' ||
     pathname === '/api/auth/login' ||
@@ -157,7 +158,7 @@ export class WebSocketServer {
         const pathname = url.pathname;
 
         // 0. Sidecar WebSocket upgrade (has its own JWT auth)
-        if (pathname === '/sidecar/connect' && self.sidecarManager) {
+        if ((pathname === '/sidecar' || pathname === '/sidecar/connect') && self.sidecarManager) {
           const authHeader = req.headers.get('Authorization');
           const token = authHeader?.startsWith('Bearer ')
             ? authHeader.slice(7)

@@ -321,8 +321,11 @@ export async function startDaemon(userConfig?: Partial<DaemonConfig>): Promise<v
 
     // 6c. Create sidecar manager
     const sidecarManager = new SidecarManager(jarvisConfig.daemon.data_dir.replace('~', os.homedir()));
-    const brainDomain = jarvisConfig.daemon.brain_domain ?? `localhost:${config.port}`;
-    sidecarManager.setBrainUrl(brainDomain);
+    const configuredBrainUrl =
+      jarvisConfig.daemon.brain_url ??
+      jarvisConfig.daemon.brain_domain ??
+      `localhost:${config.port}`;
+    sidecarManager.setBrainUrl(configuredBrainUrl);
 
     // 6d. Wire sidecar manager to WebSocket server for WS routing
     wsService.getServer().setSidecarManager(sidecarManager);
