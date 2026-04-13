@@ -31,6 +31,7 @@ describe('Config Loader', () => {
     const testConfig = structuredClone(DEFAULT_CONFIG);
     testConfig.daemon.port = 9999;
     testConfig.llm.primary = 'openai';
+    testConfig.dashboard = { password_hash: '$2b$test-hash' };
 
     await saveConfig(testConfig, TEST_CONFIG_PATH);
     expect(existsSync(TEST_CONFIG_PATH)).toBe(true);
@@ -38,6 +39,7 @@ describe('Config Loader', () => {
     const loaded = await loadConfig(TEST_CONFIG_PATH);
     expect(loaded.daemon.port).toBe(9999);
     expect(loaded.llm.primary).toBe('openai');
+    expect(loaded.dashboard?.password_hash).toBe('$2b$test-hash');
   });
 
   test('deep merges partial config with defaults', async () => {
@@ -111,6 +113,7 @@ describe('Default Config', () => {
     expect(DEFAULT_CONFIG.llm.gemini?.model).toBe('gemini-3-flash-preview');
     expect(DEFAULT_CONFIG.llm.ollama?.model).toBe('llama3');
     expect(DEFAULT_CONFIG.llm.ollama?.base_url).toBe('http://localhost:11434');
+    expect(DEFAULT_CONFIG.dashboard?.password_hash).toBeUndefined();
   });
 });
 
