@@ -124,6 +124,11 @@ export type AuthConfig = {
   token?: string;
 };
 
+export type DashboardConfig = {
+  /** Password hash for dashboard login. If unset, password auth is disabled. */
+  password_hash?: string;
+};
+
 export type UserConfig = {
   name?: string;
 };
@@ -138,6 +143,7 @@ export type JarvisConfig = {
     brain_domain?: string;
   };
   auth?: AuthConfig;
+  dashboard?: DashboardConfig;
   google?: GoogleConfig;
   channels?: ChannelConfig;
   stt?: STTConfig;
@@ -182,6 +188,7 @@ export const DEFAULT_CONFIG: JarvisConfig = {
     data_dir: '~/.jarvis',
     db_path: '~/.jarvis/jarvis.db',
   },
+  dashboard: {},
   channels: {
     telegram: { enabled: false, bot_token: '', allowed_users: [] },
     discord: { enabled: false, bot_token: '', allowed_users: [] },

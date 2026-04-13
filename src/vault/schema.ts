@@ -656,6 +656,16 @@ function createTables(db: Database): void {
     )
   `);
 
+  // Dashboard sessions: server-side auth sessions for the panel
+  db.run(`
+    CREATE TABLE IF NOT EXISTS dashboard_sessions (
+      id TEXT PRIMARY KEY,
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL
+    )
+  `);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_dashboard_sessions_expires ON dashboard_sessions(expires_at)`);
+
   // Documents table: vault-stored documents created by JARVIS
   db.run(`
     CREATE TABLE IF NOT EXISTS documents (
