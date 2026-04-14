@@ -40,7 +40,7 @@ func (o *ClipboardObserver) Run(ctx context.Context, send EventSender) {
 		o.mu.Lock()
 		o.lastContent = initial
 		o.mu.Unlock()
-		log.Printf("[clipboard] Initial content: %q", truncate(initial, 50))
+		log.Printf("[clipboard] Initial content captured (%d bytes)", len(initial))
 	}
 
 	log.Printf("[clipboard] Monitoring clipboard (every %s)", o.pollInterval)
@@ -90,8 +90,10 @@ func (o *ClipboardObserver) Run(ctx context.Context, send EventSender) {
 
 // readClipboardContent reads the system clipboard using platform commands.
 func readClipboardContent() (string, error) {
-	return platformClipboardRead()
+	return clipboardReader()
 }
+
+var clipboardReader = platformClipboardRead
 
 // ── Screen Observer ──────────────────────────────────────────────────
 

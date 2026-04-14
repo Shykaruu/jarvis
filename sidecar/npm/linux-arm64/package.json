@@ -1,11 +1,17 @@
 {
   "name": "@shykaruu/jarvis-sidecar-linux-arm64",
-  "version": "0.1.0",
+  "version": "0.1.4",
   "description": "Jarvis sidecar binary for Linux ARM64",
-  "os": ["linux"],
-  "cpu": ["arm64"],
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "arm64"
+  ],
   "bin": {
     "jarvis-sidecar": "bin/jarvis-sidecar"
   },
-  "files": ["bin/jarvis-sidecar"]
+  "files": [
+    "bin/jarvis-sidecar"
+  ]
 }

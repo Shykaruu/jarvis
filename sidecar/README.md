@@ -21,6 +21,9 @@ GOOS=windows go build -o jarvis-sidecar.exe .
 # First run — enroll with a token from the brain
 ./jarvis-sidecar --token <jwt>
 
+# Override the brain URL explicitly
+./jarvis-sidecar --brain-url wss://axiom-er.ddns.net/sidecar
+
 # Subsequent runs — uses saved token
 ./jarvis-sidecar
 ```
@@ -37,6 +40,11 @@ brain_url: "wss://axiom-er.ddns.net/sidecar"
 ```
 
 If `brain_url` is set, the sidecar connects to that URL. If it is omitted, the sidecar falls back to the brain URL embedded in the enrollment token, which preserves the existing localhost-based behavior.
+
+Precedence is:
+1. `--brain-url`
+2. `brain_url` in `~/.jarvis-sidecar/config.yaml`
+3. the `brain` value embedded in the enrollment token
 
 ## File Structure
 
