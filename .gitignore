@@ -50,5 +50,8 @@ ui/dist/
 # sidecar build output
 sidecar/desktop-bridge/bin/
 sidecar/desktop-bridge/obj/
-
 eng.traineddata
+
+# SSH keys (user-specific)
+y
+y.pub
