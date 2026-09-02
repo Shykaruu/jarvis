@@ -14,6 +14,7 @@ import (
 	"github.com/jarvis/sidecar/internal/brand"
 	"github.com/jarvis/sidecar/internal/webview2"
 	"github.com/jarvis/sidecar/internal/webviewui"
+	"github.com/jarvis/sidecar/internal/winchrome"
 )
 
 func guiSupported() bool {
@@ -72,7 +73,10 @@ func runWizard(registryURL string, noLaunch, autostartDefault bool) int {
 		return st
 	}
 
-	opened := webviewui.RunWindow("Install Jarvis", 480, 560, webview.HintNone, func(w webview.WebView) {
+	// NativeTitleBar on purpose: this is the first window a user ever sees from
+	// this project, run before anything is installed, so it wears the system's
+	// chrome rather than asking for trust with a title bar of our own.
+	opened := webviewui.RunWindow("Install Jarvis", 480, 560, webview.HintNone, winchrome.NativeTitleBar, func(w webview.WebView) {
 
 		// startPlan resolves versions on a goroutine. Bindings run ON the UI
 		// thread, so doing the (up to 60s) registry fetch inline would block
