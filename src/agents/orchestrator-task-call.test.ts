@@ -55,6 +55,20 @@ function toolCall(name: string, args: Record<string, unknown>): LLMResponse {
   };
 }
 
+function response(
+  content: string,
+  finish: LLMResponse['finish_reason'],
+  calls: LLMToolCall[] = [],
+): LLMResponse {
+  return {
+    content,
+    tool_calls: calls,
+    usage: { input_tokens: 10, output_tokens: 5 },
+    model: 'scripted',
+    finish_reason: finish,
+  };
+}
+
 function makeOrchestrator(provider: LLMProvider): AgentOrchestrator {
   const m = new LLMManager();
   m.registerProvider(provider);
@@ -92,6 +106,159 @@ describe('AgentOrchestrator.processTaskCall', () => {
       // conversation buffer includes system + user + assistant
       expect(result.conversation.length).toBeGreaterThanOrEqual(3);
     }
+  });
+
+  it('accepts a tool-less answer unchanged when requireToolUse is off', async () => {
+    const provider = new ScriptedProvider([text('done')]);
+    const orch = makeOrchestrator(provider);
+
+    const result = await orch.processTaskCall({
+      systemPrompt: 'task system',
+      userMessage: 'draft a thank-you note',
+      tier: 'medium',
+      subsystem: 'task_test',
+    });
+    expect(result.kind).toBe('completed');
+    if (result.kind === 'completed') expect(result.text).toBe('done');
+  });
+
+  it('pushes back once when the model announces work instead of doing it', async () => {
+    // What the hosted medium tier actually did: an announcement, no tool call,
+    // ~2s. Without the push-back this string becomes the task's result and the
+    // conversation tier reads it to the user as a progress note.
+    const provider = new ScriptedProvider([
+      text("On it - I'll open Notepad, then verify it's in the foreground."),
+      toolCall('open_app', { name: 'notepad' }),
+      text('Notepad is open and focused (PID 16672).'),
+    ]);
+    const orch = makeOrchestrator(provider);
+
+    const result = await orch.processTaskCall({
+      systemPrompt: 'task system',
+      userMessage: 'open notepad',
+      tier: 'medium',
+      subsystem: 'task_test',
+      requireToolUse: true,
+    });
+
+    expect(result.kind).toBe('completed');
+    if (result.kind !== 'completed') return;
+    expect(result.text).toBe('Notepad is open and focused (PID 16672).');
+    // The announcement and the push-back are both in the buffer, so a resume
+    // replays why the model was told to act.
+    const roles = (result.conversation as { role: string }[]).map((m) => m.role);
+    expect(roles.filter((r) => r === 'user').length).toBe(2);
+  });
+
+  it('gives up after a bounded number of push-backs', async () => {
+    const provider = new ScriptedProvider([
+      text('I will get right on that.'),
+      text('Getting on it now.'),
+      text('I am still about to get on that.'),
+    ]);
+    const orch = makeOrchestrator(provider);
+
+    const result = await orch.processTaskCall({
+      systemPrompt: 'task system',
+      userMessage: 'open notepad',
+      tier: 'medium',
+      subsystem: 'task_test',
+      requireToolUse: true,
+    });
+    expect(result.kind).toBe('completed');
+    if (result.kind === 'completed') {
+      expect(result.text).toBe('I am still about to get on that.');
+    }
+  });
+
+  it('does not push back on a resumed task that already ran tools', async () => {
+    // The pre-pause buffer carries the tool results. Pushing back here would
+    // tell a model that already sent the mail that nothing has been done.
+    const provider = new ScriptedProvider([text('Already done - Notepad is open.')]);
+    const orch = makeOrchestrator(provider);
+
+    const result = await orch.processTaskCall({
+      systemPrompt: 'task system',
+      userMessage: 'yes, go ahead',
+      tier: 'medium',
+      subsystem: 'task_test',
+      requireToolUse: true,
+      history: [
+        { role: 'system', content: 'task system' },
+        { role: 'user', content: 'open notepad' },
+        { role: 'assistant', content: '', tool_calls: [{ id: 'c1', name: 'open_app', arguments: {} }] },
+        { role: 'tool', content: 'opened', tool_call_id: 'c1' },
+      ],
+    });
+
+    expect(result.kind).toBe('completed');
+    if (result.kind === 'completed') {
+      expect(result.text).toBe('Already done - Notepad is open.');
+    }
+  });
+
+  it('does not push back when the provider reported calls without a tool_use finish', async () => {
+    // Gemini marks every function call STOP, so its calls arrive here.
+    const provider = new ScriptedProvider([
+      response('Opening notepad.', 'stop', [{ id: 'c1', name: 'open_app', arguments: { name: 'notepad' } }]),
+      text('SHOULD NOT BE REACHED'),
+    ]);
+    const orch = makeOrchestrator(provider);
+
+    const result = await orch.processTaskCall({
+      systemPrompt: 'task system',
+      userMessage: 'open notepad',
+      tier: 'medium',
+      subsystem: 'task_test',
+      requireToolUse: true,
+    });
+    expect(result.kind).toBe('completed');
+    if (result.kind === 'completed') expect(result.text).toBe('Opening notepad.');
+  });
+
+  it('does not push back on a truncated answer', async () => {
+    const provider = new ScriptedProvider([
+      response('A very long draft that ran out of', 'length'),
+      text('SHOULD NOT BE REACHED'),
+    ]);
+    const orch = makeOrchestrator(provider);
+
+    const result = await orch.processTaskCall({
+      systemPrompt: 'task system',
+      userMessage: 'summarise the vault',
+      tier: 'medium',
+      subsystem: 'task_test',
+      requireToolUse: true,
+    });
+    expect(result.kind).toBe('completed');
+    if (result.kind === 'completed') {
+      expect(result.text).toContain('A very long draft that ran out of');
+      expect(result.text).toContain('truncated');
+    }
+  });
+
+  it('never re-sends an empty assistant message when pushing back', async () => {
+    // Providers reject empty assistant content once the buffer is re-sent.
+    const provider = new ScriptedProvider([
+      response('', 'stop'),
+      toolCall('open_app', { name: 'notepad' }),
+      text('Notepad is open.'),
+    ]);
+    const orch = makeOrchestrator(provider);
+
+    const result = await orch.processTaskCall({
+      systemPrompt: 'task system',
+      userMessage: 'open notepad',
+      tier: 'medium',
+      subsystem: 'task_test',
+      requireToolUse: true,
+    });
+    expect(result.kind).toBe('completed');
+    if (result.kind !== 'completed') return;
+    expect(result.text).toBe('Notepad is open.');
+    const empties = (result.conversation as { role: string; content: string }[])
+      .filter((m) => m.role === 'assistant' && !m.content?.trim() && !('tool_calls' in m));
+    expect(empties.length).toBe(0);
   });
 
   it('returns paused when LLM calls ask_for_clarification', async () => {
