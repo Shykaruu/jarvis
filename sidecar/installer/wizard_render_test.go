@@ -123,8 +123,8 @@ func TestWizardPanelSaysWhatIsOnTheMachine(t *testing.T) {
 			name:     "already current",
 			st:       with(func(s *wizardState) { s.Phase, s.Detected, s.Installed, s.UpToDate = "plan", true, true, true }),
 			status:   "Up to date",
-			subtitle: "You already have the latest sidecar.",
-			button:   "Close",
+			subtitle: "You already have the latest sidecar — it runs in the system tray, near the clock.",
+			button:   "Launch Jarvis",
 		},
 		{
 			name:   "npm owns it",
@@ -143,14 +143,26 @@ func TestWizardPanelSaysWhatIsOnTheMachine(t *testing.T) {
 			name:     "a first install that finished",
 			st:       with(func(s *wizardState) { s.Phase, s.Detected, s.Installed, s.FirstInstall = "done", true, true, true }),
 			status:   "Installed",
-			subtitle: "Installed.",
+			subtitle: "Installed. Jarvis lives in the system tray, near the clock.",
+			button:   "Launch Jarvis",
+		},
+		// The one macOS case: the done screen there routes through the
+		// permissions handoff AND names the menu bar, and both live on this
+		// exact-string surface, so pin the darwin homeSpot too.
+		{
+			name: "a first install that finished, on macOS",
+			st: with(func(s *wizardState) {
+				s.Phase, s.Detected, s.Installed, s.FirstInstall, s.Platform = "done", true, true, true, "darwin"
+			}),
+			status:   "Installed",
+			subtitle: "Installed. Jarvis will ask for its permissions, then live in the menu bar, at the top-right of your screen.",
 			button:   "Launch Jarvis",
 		},
 		{
 			name:     "an update that finished",
 			st:       with(func(s *wizardState) { s.Phase, s.Detected, s.Installed = "done", true, true }),
 			status:   "Updated",
-			subtitle: "Updated.",
+			subtitle: "Updated. Jarvis lives in the system tray, near the clock.",
 			button:   "Launch Jarvis",
 		},
 		{
